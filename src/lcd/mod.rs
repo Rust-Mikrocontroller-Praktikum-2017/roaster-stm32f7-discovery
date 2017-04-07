@@ -38,6 +38,7 @@ impl Lcd {
 
     #[inline]
     pub fn point_addr(&mut self, point: Point, layer: Layer) -> *mut u16 {
+        assert!(LCD_SIZE.contains_point(&point));
         let base: u32 = match layer {
             Layer1  =>  0xC000_0000,
             Layer2  =>  {
