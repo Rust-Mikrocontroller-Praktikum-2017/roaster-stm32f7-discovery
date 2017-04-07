@@ -26,7 +26,7 @@ pub enum Layer {
 }
 use self::Layer::*;
 
-const LCD_SIZE: Rect = Rect{
+pub const LCD_SIZE: Rect = Rect{
     origin: Point{x:0,y:0},
     width: 480,
     height: 272,
