@@ -208,8 +208,6 @@ pub fn init(ltdc: &'static mut Ltdc, rcc: &mut Rcc, gpio: &mut Gpio) -> Lcd {
         controller: ltdc,
         display_enable: display_enable,
         backlight_enable: backlight_enable,
-        next_pixel: 0,
-        next_col: 0,
         prev_value: (0, 0),
     }
 }
