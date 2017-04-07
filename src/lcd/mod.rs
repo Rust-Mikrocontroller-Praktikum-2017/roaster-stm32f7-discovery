@@ -40,7 +40,13 @@ impl Lcd {
     pub fn point_addr(&mut self, point: Point, layer: Layer) -> *mut u16 {
         let base: u32 = match layer {
             Layer1  =>  0xC000_0000,
-            Layer2  =>  0xC000_0000 + (LCD_SIZE.width * LCD_SIZE.height * 2) as u32,
+            Layer2  =>  {
+                let mut addr = LCD_SIZE.width as u32;
+                addr *= LCD_SIZE.height as u32;
+                addr *= 2;
+                addr += 0xC000_0000;
+                addr
+            }
         };
         let mut pixel_offset: u32 = point.y as u32;
         pixel_offset *= LCD_SIZE.width as u32;
