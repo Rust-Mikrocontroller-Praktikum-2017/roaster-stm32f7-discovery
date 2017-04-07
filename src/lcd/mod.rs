@@ -76,4 +76,45 @@ impl Lcd {
         r.foreach_point(|point| self.draw_point_color(point, l, c));
     }
 
+    /// Render a line using the Bresenham algorithm
+    pub fn draw_line_color(&mut self, line: Line, layer: Layer, color: u16) {
+        let Line {
+            from,
+            to
+        } = line;
+
+        assert!(from.x < LCD_SIZE.width && to.x < LCD_SIZE.width);
+        assert!(from.y < LCD_SIZE.height && to.y < LCD_SIZE.height);
+
+        let x0 = from.x as i16;
+        let y0 = from.y as i16;
+        let x1 = to.x as i16;
+        let y1 = to.y as i16;
+
+        let dx:i16 = (x0 - x1).abs();
+        let sx:i16 = if from.x < to.x {1} else {-1};
+        let dy:i16 = -(y0 - y1).abs();
+        let sy:i16 = if from.y < to.y {1} else {-1};
+
+        let mut err = dx + dy;
+        let mut x = x0;
+        let mut y = y0;
+
+        loop {
+            self.draw_point_color(Point{x:x as u16, y:y as u16}, layer, color);
+            if x == x1 && y == y1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 > dy {
+                err += dy;
+                x += sx;
+            }
+            if e2 < dx {
+                err += dx;
+                y += sy;
+            }
+        }
+    }
+
 }
