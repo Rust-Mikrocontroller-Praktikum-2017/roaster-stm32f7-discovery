@@ -1,13 +1,16 @@
+#[derive(Copy, Clone)]
 pub struct Point {
     pub x: u16,
     pub y: u16,
 }
 
+#[derive(Copy, Clone)]
 pub struct Line {
     pub from: Point,
     pub to: Point,
 }
 
+#[derive(Copy, Clone)]
 pub struct Rect {
     pub  origin: Point,
     pub  width: u16,
