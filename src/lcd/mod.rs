@@ -69,6 +69,9 @@ impl Lcd {
 
     #[inline]
     pub fn draw_point_color(&mut self, p: Point, l: Layer, c: u16) {
+        if !LCD_SIZE.contains_point(&p) {
+            return;
+        }
         let addr = self.point_addr(p, l);
         unsafe { ptr::write_volatile(addr, c) };
     }
@@ -84,8 +87,9 @@ impl Lcd {
             to
         } = line;
 
-        assert!(from.x < LCD_SIZE.width && to.x < LCD_SIZE.width);
-        assert!(from.y < LCD_SIZE.height && to.y < LCD_SIZE.height);
+        if !(from.x < LCD_SIZE.width && to.x < LCD_SIZE.width) || !(from.y < LCD_SIZE.height && to.y < LCD_SIZE.height){
+            return;
+        }
 
         let x0 = from.x as i16;
         let y0 = from.y as i16;
