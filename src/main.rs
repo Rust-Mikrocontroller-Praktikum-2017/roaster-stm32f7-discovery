@@ -1,6 +1,7 @@
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(alloc, collections)]
+#![feature(asm)]
 
 #![no_std]
 #![no_main]
@@ -44,14 +45,15 @@ pub unsafe extern "C" fn reset() -> ! {
     stm32f7::heap::init();
 
     // enable floating point unit
-    unsafe {
-        let scb = stm32f7::cortex_m::peripheral::scb_mut();
-        scb.cpacr.modify(|v| v | 0b1111 << 20);
-    }
+    let scb = stm32f7::cortex_m::peripheral::scb_mut();
+    scb.cpacr.modify(|v| v | 0b1111 << 20);
+    asm!("DSB; ISB;"::::"volatile"); // pipeline flush
 
     main(board::hw());
 }
 
+                    // WORKAROUND: rust compiler will inline & reorder fp instructions into
+#[inline(never)]    //             reset() before the FPU is initialized
 fn main(hw: board::Hardware) -> ! {
     use embedded::interfaces::gpio::{self, Gpio};
 
