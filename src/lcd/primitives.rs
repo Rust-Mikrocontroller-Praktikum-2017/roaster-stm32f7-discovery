@@ -50,7 +50,37 @@ impl Rect {
             && (y >= oy && y <= oy + self.height);
     }
 
+    pub fn extend_to_point(&mut self, p: Point) {
+        let dx = p.x as i32 - (self.origin.x + self.width) as i32;
+        let dy = p.y as i32 - (self.origin.y + self.height) as i32;
+        if dx >= 0 {
+            self.width += dx as u16 + 1;
+        }
+        if dy >= 0 {
+            self.height += dy as u16 + 1;
+        }
+    }
+
 }
 
+use core::ops::{Add,AddAssign};
 
+impl Add for Point {
+    type Output = Point;
 
+    fn add(self, other: Point) -> Point {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+impl AddAssign for Point {
+    fn add_assign(&mut self, other: Point) {
+        *self = Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        };
+    }
+}

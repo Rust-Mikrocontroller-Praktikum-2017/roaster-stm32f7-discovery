@@ -10,6 +10,8 @@ use super::color::Color;
 
 use core::cmp::max;
 use core::result::Result;
+use core::fmt::Write;
+use core;
 
 pub struct Font<'a> {
     font_info: FontInfo<&'a [u8]>,
@@ -33,41 +35,115 @@ impl<'a> Font<'a> {
     }
 }
 
+/// Public interface
 pub struct TextBox<'a> {
+    pub alignment: Alignment,
     pub canvas: Rect,
     pub font: &'a Font<'a>,
-    pub text: &'static str,
-    pub alignment: Alignment,
     pub bg_color: Color,
     pub fg_color: Color,
 }
 
+
 #[derive(Copy,Clone)]
 pub enum Alignment {
     Left,
+    Center,
+    Right
+}
+
+/// Internal Writer used to do the per-point drawing calls to the callback
+///
+/// Relationship between TextBox.canvas (TB canvas) and
+///     TextWriter.canvas (TW canvas):
+
+///   -----------------------
+///   |[TB canvas]           |  <-- alignment determines position of TB canvas
+///   -----------------------
+///   <--[TW canvas width]-->
+struct TextWriter<'a,F: FnMut(Point,Color)> {
+    /// The
+    canvas: Rect,
+    font: &'a Font<'a>,
+    bg_color: Color,
+    fg_color: Color,
+
+    draw: F,
+    off: Point,
 }
 
 impl<'a> TextBox<'a> {
 
+    /// Draw string s to the canvas
+    ///
     /// F is a closure that should draw to the output
     /// - Point: the absolute coordinate (Point is in self.canvas)
     /// - Color: the color (self.fg_color)
-    pub fn redraw<F>(&self, mut draw: F)
-        where F: FnMut(Point,&Color) {
+    ///
+    /// Internally, TextWriter is used twice to
+    ///   1. determine the effectively required canvas size
+    ///   2. do the actual drawing
+    pub fn redraw<F>(&'a self, s: &str, mut draw: F)
+        where F: FnMut(Point,Color) {
+
+        // First run: capture max bounds, but don't draw
+        let mut effective_canvas = self.canvas;
+        {
+            effective_canvas.width = 0;
+            effective_canvas.height = 0;
+
+            let mut w = TextWriter{
+                font: self.font,
+                bg_color: self.bg_color,
+                fg_color: self.fg_color,
+                canvas: self.canvas,
+                off: self.canvas.origin,
+                draw: |p,_| effective_canvas.extend_to_point(p),
+            };
+            write!(&mut w, "{}", s).unwrap();
+        }
 
         // Clear background
-        self.canvas.foreach_point(|p| draw(p, &self.bg_color));
+        effective_canvas.foreach_point(|p| draw(p, self.bg_color));
 
-        let mut off = self.canvas.origin;
+        // Determine alignment offset
+        let alignment_offset = match self.alignment {
+            Alignment::Left   => Point{x:0,y:0},
+            Alignment::Center => Point{x: (self.canvas.width - effective_canvas.width)/2,
+                                       y: 0},
+            Alignment::Right  => Point{x:  self.canvas.width - effective_canvas.width,
+                                       y: 0},
+        };
 
-        for c in self.text.chars() {
+        let mut aligned_canvas = effective_canvas;
+        aligned_canvas.origin += alignment_offset;
+
+        // Second pass, call user-provided drawing callback this time
+        let mut w = TextWriter{
+            font: self.font,
+            bg_color: self.bg_color,
+            fg_color: self.fg_color,
+            canvas: aligned_canvas,
+            off: aligned_canvas.origin,
+            draw: draw,
+        };
+        write!(&mut w, "{}", s).unwrap();
+
+    }
+}
+
+impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
+
+    fn write_str(&mut self, s: &str) -> Result<(),core::fmt::Error> {
+
+        for c in s.chars() {
 
             let mut c = c;
 
             let char_needs_render = match c {
                 '\n' => {
-                    off = Point{x: self.canvas.origin.x,
-                                y: off.y + self.font.size};
+                    self.off = Point{x: self.canvas.origin.x,
+                                y: self.off.y + self.font.size};
                     continue
                 },
                 ' ' => {
@@ -83,19 +159,19 @@ impl<'a> TextBox<'a> {
                 .expect("Failed to render glyph");
 
             // Line Wrapping
-            let mut new_x_off = off.x + (glyph.width as i32 + glyph.left) as u16 ;
+            let mut new_x_off = self.off.x + (glyph.width as i32 + glyph.left) as u16 ;
             if char_needs_render &&
-               new_x_off >= self.canvas.anchor_point(Anchor::UpperRight).x {
+               new_x_off > self.canvas.anchor_point(Anchor::UpperRight).x{
 
-                off = Point{ x: self.canvas.origin.x, y: off.y + self.font.size};
+                self.off = Point{ x: self.canvas.origin.x, y: self.off.y + self.font.size};
                 new_x_off = self.canvas.origin.x + (glyph.width as i32 + glyph.left) as u16;
 
             }
 
             // Height limit
-            let max_char_bottom = off.y + self.font.size;
-            if max_char_bottom >= self.canvas.anchor_point(Anchor::LowerRight).y {
-                break;
+            let max_char_bottom = self.off.y + self.font.size;
+            if max_char_bottom > self.canvas.anchor_point(Anchor::LowerRight).y {
+              break;
             }
 
             // Render char with appropriate offsets
@@ -108,25 +184,27 @@ impl<'a> TextBox<'a> {
                         let x = x as u16;
                         let y = y as u16;
                         let mut p = Point{x: 0, y: 0};
-                        p.x = max(((off.x + x) as i32) + glyph.left, 0) as u16;
+                        p.x = max(((self.off.x + x) as i32) + glyph.left, 0) as u16;
                         let fs = self.font.size as i32;
-                        p.y = max(((off.y + y) as i32) + glyph.top + fs, 0) as u16;
+                        p.y = max(((self.off.y + y) as i32) + glyph.top + fs, 0) as u16;
 
-                        let c = mix_color(&self.fg_color, &self.bg_color, shade);
+                        let c = mix_color(self.fg_color, self.bg_color, shade);
 
-                        draw(p, &c);
+                        (self.draw)(p, c);
                     }
                 }
             }
 
-            off.x = new_x_off;
+            self.off.x = new_x_off;
 
         }
+
+        Ok(())
 
     }
 }
 
-fn mix_color(a: &Color, b: &Color, a_amt: u8) -> Color {
+fn mix_color(a: Color, b: Color, a_amt: u8) -> Color {
     Color{
         red: mix_u8(a.red, b.red, a_amt),
         green: mix_u8(a.green, b.green, a_amt),
