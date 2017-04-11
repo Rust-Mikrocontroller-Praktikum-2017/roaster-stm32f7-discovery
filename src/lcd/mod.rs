@@ -3,10 +3,12 @@
 mod init;
 mod color;
 mod primitives;
+mod text;
 
 pub use self::color::Color;
 pub use self::init::init;
 pub use self::primitives::*;
+pub use self::text::*;
 
 use board::ltdc::Ltdc;
 use embedded::interfaces::gpio::OutputPin;

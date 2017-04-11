@@ -17,6 +17,12 @@ pub struct Rect {
     pub  height: u16,
 }
 
+#[derive(PartialEq,Copy,Clone)]
+pub enum Anchor {
+    UpperRight,
+    LowerRight,
+}
+
 impl Rect {
     pub fn foreach_point<V>(&self, mut v: V) where V: FnMut(Point) {
         for i in (self.origin.y)..(self.origin.y+self.height) {
@@ -24,6 +30,15 @@ impl Rect {
                 let p = Point{x: j, y: i};
                 v(p);
             }
+        }
+    }
+
+    #[inline]
+    pub fn anchor_point(&self, anchor: Anchor) -> Point {
+        match anchor {
+            Anchor::UpperRight => Point{x: self.origin.x + self.width, y: self.origin.y},
+            Anchor::LowerRight => Point{x: self.origin.x + self.width,
+                                        y: self.origin.y + self.height},
         }
     }
 

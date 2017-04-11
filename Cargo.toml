@@ -18,6 +18,8 @@ rlibc = "1.0.0"
 spin = "0.4.5"
 volatile = "0.2.1"
 net = {git = "https://github.com/embed-rs/net.git"}
+font-rs = {git = "https://github.com/phil-opp/font-rs.git", branch = "no-std"}
+stb_truetype = {git = "https://github.com/phil-opp/stb_truetype-rs.git"}
 
 [dependencies.arrayvec]
 default-features = false
