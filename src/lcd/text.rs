@@ -84,7 +84,7 @@ impl<'a> TextBox<'a> {
     /// Internally, TextWriter is used twice to
     ///   1. determine the effectively required canvas size
     ///   2. do the actual drawing
-    pub fn redraw<F>(&'a self, s: &str, mut draw: F)
+    pub fn redraw<F>(&mut self, s: &str, mut draw: F)
         where F: FnMut(Point,Color) {
 
         // First run: capture max bounds, but don't draw
