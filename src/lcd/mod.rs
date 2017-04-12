@@ -28,6 +28,23 @@ pub enum Layer {
 }
 use self::Layer::*;
 
+#[derive(Copy, Clone)]
+pub struct LineStyle {
+    visible_px: u16, invisible_px: u16
+}
+pub const SOLID: LineStyle = LineStyle {
+    visible_px: 1,
+    invisible_px: 0,
+};
+pub const DOTTED: LineStyle = LineStyle {
+    visible_px: 1,
+    invisible_px: 1,
+};
+pub const DASHED: LineStyle = LineStyle {
+    visible_px: 3,
+    invisible_px: 2,
+};
+
 pub const LCD_SIZE: Rect = Rect{
     origin: Point{x:0,y:0},
     width: 480,
@@ -83,7 +100,7 @@ impl Lcd {
     }
 
     /// Render a line using the Bresenham algorithm
-    pub fn draw_line_color(&mut self, line: Line, layer: Layer, color: u16) {
+    pub fn draw_line_color(&mut self, line: Line, layer: Layer, color: u16, style: LineStyle) {
         let Line {
             from,
             to
@@ -107,8 +124,14 @@ impl Lcd {
         let mut x = x0;
         let mut y = y0;
 
+        let LineStyle {visible_px, invisible_px} = style;
+        let mut px_counter = 0;
+
         loop {
-            self.draw_point_color(Point{x:x as u16, y:y as u16}, layer, color);
+            if px_counter % (visible_px + invisible_px) < visible_px {
+                self.draw_point_color(Point{x:x as u16, y:y as u16}, layer, color);
+            }
+            px_counter += 1;
             if x == x1 && y == y1 {
                 break;
             }
