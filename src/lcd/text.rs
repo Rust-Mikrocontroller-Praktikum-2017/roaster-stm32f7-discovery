@@ -39,6 +39,8 @@ impl<'a> Font<'a> {
 pub struct TextBox<'a> {
     pub alignment: Alignment,
     pub canvas: Rect,
+    /// Reset this to None when changing canvas
+    pub last_effective_canvas: Option<Rect>,
     pub font: &'a Font<'a>,
     pub bg_color: Color,
     pub fg_color: Color,
@@ -88,10 +90,10 @@ impl<'a> TextBox<'a> {
         where F: FnMut(Point,Color) {
 
         // First run: capture max bounds, but don't draw
-        let mut effective_canvas = self.canvas;
+        let mut left_aligned_effective = self.canvas;
         {
-            effective_canvas.width = 0;
-            effective_canvas.height = 0;
+            left_aligned_effective.width = 0;
+            left_aligned_effective.height = 0;
 
             let mut w = TextWriter{
                 font: self.font,
@@ -100,37 +102,50 @@ impl<'a> TextBox<'a> {
                 canvas: self.canvas,
                 off: self.canvas.origin,
                 last_glyph_id: None,
-                draw: |p,_| effective_canvas.extend_to_point(p),
+                draw: |p,_| {
+                    let r = Rect::union(left_aligned_effective,
+                                        Rect{origin:p, width: 1, height: 1});
+                    left_aligned_effective.width = r.width;
+                    left_aligned_effective.height = r.height;
+                },
             };
             write!(&mut w, "{}", s).unwrap();
         }
 
-        // Clear background
-        effective_canvas.foreach_point(|p| draw(p, self.bg_color));
-
         // Determine alignment offset
         let alignment_offset = match self.alignment {
             Alignment::Left   => Point{x:0,y:0},
-            Alignment::Center => Point{x: (self.canvas.width - effective_canvas.width)/2,
+            Alignment::Center => Point{x: (self.canvas.width - left_aligned_effective.width)/2,
                                        y: 0},
-            Alignment::Right  => Point{x:  self.canvas.width - effective_canvas.width,
+            Alignment::Right  => Point{x:  self.canvas.width - left_aligned_effective.width,
                                        y: 0},
         };
 
-        let mut aligned_canvas = effective_canvas;
-        aligned_canvas.origin += alignment_offset;
+        let mut effective_canvas = self.canvas;
+        effective_canvas.origin += alignment_offset;
+
+        // Clear background where necessary
+        if let Some(old_canvas) = self.last_effective_canvas {
+            let clear = Rect::union(old_canvas, effective_canvas);
+            clear.foreach_point(|p| draw(p, self.bg_color));
+        } else {
+            self.canvas.foreach_point(|p| draw(p, self.bg_color));
+        }
+
 
         // Second pass, call user-provided drawing callback this time
         let mut w = TextWriter{
             font: self.font,
             bg_color: self.bg_color,
             fg_color: self.fg_color,
-            canvas: aligned_canvas,
-            off: aligned_canvas.origin,
+            canvas: effective_canvas,
+            off: effective_canvas.origin,
             last_glyph_id: None,
             draw: draw,
         };
         write!(&mut w, "{}", s).unwrap();
+
+        self.last_effective_canvas = Some(effective_canvas);
 
     }
 }
@@ -211,7 +226,9 @@ impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
                 // Draw left and right of glyph [2]
                 //  acts as background at the edge of glyph
                 for y in 0..glyph.height {
-                    for x in (0..(start_x as usize)).chain(glyph.width..advance_width as usize) {
+                    let start_x = start_x as usize;
+                    let advance_width = advance_width as usize;
+                    for x in (0..start_x).chain((start_x + glyph.width)..advance_width) {
                         let p = Point{
                                 x: self.off.x + (x as u16),
                                 y: self.off.y + (y as u16),

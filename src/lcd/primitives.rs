@@ -52,20 +52,41 @@ impl Rect {
             && (y >= oy && y <= oy + self.height);
     }
 
-    pub fn extend_to_point(&mut self, p: Point) {
-        let dx = p.x as i32 - (self.origin.x + self.width) as i32;
-        let dy = p.y as i32 - (self.origin.y + self.height) as i32;
-        if dx >= 0 {
-            self.width += dx as u16 + 1;
-        }
-        if dy >= 0 {
-            self.height += dy as u16 + 1;
+    pub fn union(a: Rect, b: Rect) -> Rect {
+        let a_max = a.anchor_point(Anchor::LowerRight);
+        let b_max = b.anchor_point(Anchor::LowerRight);
+
+        let o = Point::min(a.origin, b.origin);
+        let max = Point::max(a_max, b_max);
+
+        Rect{
+            origin: o,
+            width: max.x - o.x,
+            height: max.y - o.y,
         }
     }
 
 }
 
+impl Point {
+    fn max(a: Point, b: Point) -> Point {
+        use core::cmp::max;
+        Point{
+            x: max(a.x,b.x),
+            y: max(a.y,b.y),
+        }
+    }
+    fn min(a: Point, b: Point) -> Point {
+        use core::cmp::min;
+        Point{
+            x: min(a.x, b.x),
+            y: min(a.y, b.y),
+        }
+    }
+}
+
 use core::ops::{Add,AddAssign};
+
 
 impl Add for Point {
     type Output = Point;
