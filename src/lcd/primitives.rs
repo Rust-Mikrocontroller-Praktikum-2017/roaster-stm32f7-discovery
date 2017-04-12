@@ -48,8 +48,8 @@ impl Rect {
     pub fn contains_point(&self, p: &Point) -> bool {
         let Point{x,y} = *p;
         let Point{x:ox,y:oy} = self.origin;
-        return (x >= ox && x <= ox + self.width)
-            && (y >= oy && y <= oy + self.height);
+        return (x >= ox && x < ox + self.width)
+            && (y >= oy && y < oy + self.height);
     }
 
     pub fn union(a: Rect, b: Rect) -> Rect {
