@@ -16,7 +16,7 @@ use core;
 pub struct Font<'a> {
     font_info: FontInfo<&'a [u8]>,
     font: font::Font<'a>,
-    size: u16,
+    pub size: u16,
 }
 
 #[derive(Debug)]
