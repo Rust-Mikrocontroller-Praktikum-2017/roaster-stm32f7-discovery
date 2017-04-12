@@ -34,7 +34,7 @@ pub const LCD_SIZE: Rect = Rect{
     height: 272,
 };
 
-const CLEAR_COLOR: u16 = 0;
+pub const CLEAR_COLOR: Color = Color{red: 0, green: 0, blue: 0, alpha: 0};
 
 impl Lcd {
 
@@ -65,8 +65,8 @@ impl Lcd {
     }
 
     pub fn clear_screen(&mut self) {
-        self.fill_rect_color(LCD_SIZE, Layer1, CLEAR_COLOR);
-        self.fill_rect_color(LCD_SIZE, Layer2, CLEAR_COLOR);
+        self.fill_rect_color(LCD_SIZE, Layer1, CLEAR_COLOR.to_argb1555());
+        self.fill_rect_color(LCD_SIZE, Layer2, CLEAR_COLOR.to_argb1555());
     }
 
     #[inline]
