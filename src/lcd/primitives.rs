@@ -21,6 +21,7 @@ pub struct Rect {
 pub enum Anchor {
     UpperRight,
     LowerRight,
+    LowerLeft,
 }
 
 impl Rect {
@@ -39,6 +40,7 @@ impl Rect {
             Anchor::UpperRight => Point{x: self.origin.x + self.width, y: self.origin.y},
             Anchor::LowerRight => Point{x: self.origin.x + self.width,
                                         y: self.origin.y + self.height},
+            Anchor::LowerLeft => Point{x: self.origin.x, y: self.origin.y + self.height},
         }
     }
 
