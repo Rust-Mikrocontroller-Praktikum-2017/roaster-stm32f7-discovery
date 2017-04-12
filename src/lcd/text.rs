@@ -158,13 +158,19 @@ impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
                 .render_glyph(glyph_id as u16, self.font.size as u32)
                 .expect("Failed to render glyph");
 
+            let advance_width = {
+                let scale = self.font.font_info.scale_for_mapping_em_to_pixels(self.font.size as f32);
+                let unscaled = self.font.font_info.get_glyph_h_metrics(glyph_id).advance_width;
+                scale * (unscaled as f32)
+            };
+
             // Line Wrapping
-            let mut new_x_off = self.off.x + (glyph.width as i32 + glyph.left) as u16 ;
+            let mut new_x_off = self.off.x + (advance_width as i32) as u16 ;
             if char_needs_render &&
                new_x_off > self.canvas.anchor_point(Anchor::UpperRight).x{
 
                 self.off = Point{ x: self.canvas.origin.x, y: self.off.y + self.font.size};
-                new_x_off = self.canvas.origin.x + (glyph.width as i32 + glyph.left) as u16;
+                new_x_off = self.canvas.origin.x + (advance_width as i32) as u16;
 
             }
 
@@ -184,13 +190,22 @@ impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
                         let x = x as u16;
                         let y = y as u16;
                         let mut p = Point{x: 0, y: 0};
-                        p.x = max(((self.off.x + x) as i32) + glyph.left, 0) as u16;
+                        p.x = max(((self.off.x + x) as i32), 0) as u16;
                         let fs = self.font.size as i32;
                         p.y = max(((self.off.y + y) as i32) + glyph.top + fs, 0) as u16;
 
                         let c = mix_color(self.fg_color, self.bg_color, shade);
 
                         (self.draw)(p, c);
+                    }
+                }
+                for y in 0..glyph.height {
+                    for x in glyph.width..(advance_width as usize) {
+                        let p = Point{
+                            x: self.off.x + (x as u16),
+                            y: self.off.y + (y as u16),
+                        };
+                        (self.draw)(p, self.bg_color);
                     }
                 }
             }
