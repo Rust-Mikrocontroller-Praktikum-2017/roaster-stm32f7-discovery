@@ -70,6 +70,7 @@ struct TextWriter<'a,F: FnMut(Point,Color)> {
 
     draw: F,
     off: Point,
+    last_glyph_id: Option<u32>,
 }
 
 impl<'a> TextBox<'a> {
@@ -98,6 +99,7 @@ impl<'a> TextBox<'a> {
                 fg_color: self.fg_color,
                 canvas: self.canvas,
                 off: self.canvas.origin,
+                last_glyph_id: None,
                 draw: |p,_| effective_canvas.extend_to_point(p),
             };
             write!(&mut w, "{}", s).unwrap();
@@ -125,6 +127,7 @@ impl<'a> TextBox<'a> {
             fg_color: self.fg_color,
             canvas: aligned_canvas,
             off: aligned_canvas.origin,
+            last_glyph_id: None,
             draw: draw,
         };
         write!(&mut w, "{}", s).unwrap();
@@ -159,18 +162,25 @@ impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
                 .expect("Failed to render glyph");
 
             let advance_width = {
-                let scale = self.font.font_info.scale_for_mapping_em_to_pixels(self.font.size as f32);
-                let unscaled = self.font.font_info.get_glyph_h_metrics(glyph_id).advance_width;
-                scale * (unscaled as f32)
+                let scale = self.font.font_info
+                                .scale_for_mapping_em_to_pixels(self.font.size as f32);
+
+                let advance = self.font.font_info
+                                        .get_glyph_h_metrics(glyph_id).advance_width;
+                let kern_advance = match self.last_glyph_id {
+                    Some(from) => self.font.font_info.get_glyph_kern_advance(from, glyph_id),
+                    None      => 0,
+                };
+                (scale * ((advance + kern_advance) as f32)) as i32
             };
 
             // Line Wrapping
-            let mut new_x_off = self.off.x + (advance_width as i32) as u16 ;
+            let mut new_x_off = self.off.x + advance_width as u16 ;
             if char_needs_render &&
                new_x_off > self.canvas.anchor_point(Anchor::UpperRight).x{
 
                 self.off = Point{ x: self.canvas.origin.x, y: self.off.y + self.font.size};
-                new_x_off = self.canvas.origin.x + (advance_width as i32) as u16;
+                new_x_off = self.canvas.origin.x + advance_width as u16;
 
             }
 
@@ -182,15 +192,44 @@ impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
 
             // Render char with appropriate offsets
             if char_needs_render {
+
+                // We render the glyph centered in its advance_width
+                // ------------------------      ^
+                // |      |       |       |      |
+                // |      | GLYPH |       |    [glyh_range.height]
+                // |      |       |       |      |
+                // ------------------------      v
+                //        <--[1]-->
+                //  <-[2]->       <-[2]-->
+                // <---|advance_width|---->
+                //
+                // [1] = glyph_range.widht
+                // [2] = start_x
+
+                let start_x = ((advance_width - glyph.width as i32)/2) as u16;
+
+                // Draw left and right of glyph [2]
+                //  acts as background at the edge of glyph
+                for y in 0..glyph.height {
+                    for x in (0..(start_x as usize)).chain(glyph.width..advance_width as usize) {
+                        let p = Point{
+                                x: self.off.x + (x as u16),
+                                y: self.off.y + (y as u16),
+                            };
+                        (self.draw)(p, self.bg_color);
+                    }
+                }
+
+                // Draw glyph [1]
+                //  we draw onto background
                 for y in 0..glyph.height {
                     for x in 0..glyph.width {
-
                         let shade = glyph.data[y * glyph.width + x];
 
                         let x = x as u16;
                         let y = y as u16;
                         let mut p = Point{x: 0, y: 0};
-                        p.x = max(((self.off.x + x) as i32), 0) as u16;
+                        p.x = max(((self.off.x + x + start_x) as i32), 0) as u16;
                         let fs = self.font.size as i32;
                         p.y = max(((self.off.y + y) as i32) + glyph.top + fs, 0) as u16;
 
@@ -199,18 +238,11 @@ impl<'a, F: FnMut(Point,Color)> Write for TextWriter<'a, F>{
                         (self.draw)(p, c);
                     }
                 }
-                for y in 0..glyph.height {
-                    for x in glyph.width..(advance_width as usize) {
-                        let p = Point{
-                            x: self.off.x + (x as u16),
-                            y: self.off.y + (y as u16),
-                        };
-                        (self.draw)(p, self.bg_color);
-                    }
-                }
+
             }
 
             self.off.x = new_x_off;
+            self.last_glyph_id = Some(glyph_id);
 
         }
 
